@@ -27,8 +27,10 @@ export default class PreloadScene extends Phaser.Scene {
     }
 
     create() {
-        if (document.fonts) {
-            document.fonts.ready.then(() => {
+        if (document.fonts && document.fonts.load) {
+            document.fonts.load('10px "Press Start 2P"').then(() => {
+                this.scene.start('MenuScene');
+            }).catch(() => {
                 this.scene.start('MenuScene');
             });
         } else {

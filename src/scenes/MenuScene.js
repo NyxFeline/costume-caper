@@ -91,6 +91,9 @@ export default class MenuScene extends Phaser.Scene {
     create() {
         const { width, height } = this.scale;
 
+        // Thiết lập màu nền buồng tối ma mị chuẩn Halloween
+        this.cameras.main.setBackgroundColor('#0d051a');
+
         // Khởi tạo audio khi có tương tác đầu tiên
         this.input.once('pointerdown', () => this.audio.init());
         this.input.keyboard.once('keydown', () => this.audio.init());
@@ -143,10 +146,10 @@ export default class MenuScene extends Phaser.Scene {
             "...OOOOOOOO..."
         ];
         this.drawPixelGrid('pumpkin_icon', PUMPKIN_GRID, {
-            'S': '#2d6a4f', // cuống xanh
-            'O': '#7f260f', // viền nâu cam cháy
-            'o': '#f76707', // thịt bí ngô cam tươi
-            'Y': '#ffee32', // mắt và miệng khắc phát sáng vàng
+            'S': '#38b000', // cuống xanh sáng
+            'O': '#9a3412', // viền nâu cam cháy
+            'o': '#ff7518', // cam bí ngô tươi sáng
+            'Y': '#ffea00', // mắt và miệng vàng rực
         });
 
         // Dơi vỗ cánh 1 (12x8)
@@ -171,10 +174,10 @@ export default class MenuScene extends Phaser.Scene {
             "XX........XX",
             "X..........X"
         ];
-        this.drawPixelGrid('bat_1', BAT_1, { 'X': '#1b112c', 'R': '#ff2a5f' });
-        this.drawPixelGrid('bat_2', BAT_2, { 'X': '#1b112c', 'R': '#ff2a5f' });
+        this.drawPixelGrid('bat_1', BAT_1, { 'X': '#221538', 'R': '#ff2a5f' });
+        this.drawPixelGrid('bat_2', BAT_2, { 'X': '#221538', 'R': '#ff2a5f' });
 
-        // Mặt trăng máu ma mị (21x19)
+        // Mặt trăng ma mị (21x19)
         const MOON_GRID = [
             ".......GGGGGGG.......",
             "....GGMMMMMMMMMGG....",
@@ -197,10 +200,10 @@ export default class MenuScene extends Phaser.Scene {
             ".......GGGGGGG......."
         ];
         this.drawPixelGrid('spooky_moon', MOON_GRID, {
-            'G': '#4a2574',
-            'M': '#f3c053',
-            'L': '#fff4ba',
-            'C': '#c77800'
+            'G': '#431f6e',
+            'M': '#ffd166',
+            'L': '#fff3b0',
+            'C': '#e09f3e'
         });
 
         // Đốm lửa ma thuật / tàn tro
@@ -220,7 +223,7 @@ export default class MenuScene extends Phaser.Scene {
             ".XXXXXXXXXX.",
             "XXXXXXXXXXXX"
         ];
-        this.drawPixelGrid('tombstone', TOMB_GRID, { 'X': '#2d2238' });
+        this.drawPixelGrid('tombstone', TOMB_GRID, { 'X': '#241a33' });
     }
 
     /**
@@ -249,20 +252,17 @@ export default class MenuScene extends Phaser.Scene {
      * Bầu trời đêm tím đen, trăng rằm ma quái và hàng bia mộ nghĩa địa
      */
     createSpookyBackground(width, height) {
-        const bg = this.add.graphics();
-
-        // Dải màu gradient từ tím tối đến tím than
-        bg.fillGradientStyle(0x0a0414, 0x0a0414, 0x1f0b35, 0x140624, 1);
-        bg.fillRect(0, 0, width, height);
+        // Nền tối đậm làm nổi bật toàn bộ chữ và hiệu ứng
+        this.add.rectangle(0, 0, width, height, 0x0d051a).setOrigin(0, 0).setDepth(0);
 
         // Các ngôi sao nhấp nháy trên bầu trời
-        for (let i = 0; i < 28; i++) {
+        for (let i = 0; i < 24; i++) {
             const sx = Phaser.Math.Between(4, width - 4);
-            const sy = Phaser.Math.Between(4, 95);
-            const star = this.add.rectangle(sx, sy, 1, 1, 0xffe8a3, Phaser.Math.FloatBetween(0.3, 0.9));
+            const sy = Phaser.Math.Between(4, 90);
+            const star = this.add.rectangle(sx, sy, 1, 1, 0xffe8a3, Phaser.Math.FloatBetween(0.3, 0.8)).setDepth(1);
             this.tweens.add({
                 targets: star,
-                alpha: { from: 0.2, to: 0.9 },
+                alpha: { from: 0.1, to: 0.9 },
                 duration: Phaser.Math.Between(800, 2200),
                 yoyo: true,
                 repeat: -1,
@@ -271,7 +271,7 @@ export default class MenuScene extends Phaser.Scene {
         }
 
         // Mặt trăng ma quái ở góc phải trên
-        const moon = this.add.image(268, 32, 'spooky_moon').setDepth(1);
+        const moon = this.add.image(270, 32, 'spooky_moon').setDepth(1);
         this.tweens.add({
             targets: moon,
             scale: { from: 1, to: 1.05 },
@@ -283,7 +283,7 @@ export default class MenuScene extends Phaser.Scene {
 
         // Mặt đất nghĩa địa mấp mô
         const ground = this.add.graphics().setDepth(2);
-        ground.fillStyle(0x0e0618, 1);
+        ground.fillStyle(0x160829, 1);
         ground.beginPath();
         ground.moveTo(0, height - 16);
         ground.lineTo(60, height - 20);
@@ -381,22 +381,22 @@ export default class MenuScene extends Phaser.Scene {
     }
 
     /**
-     * Tiêu đề game: Font Press Start 2P sắc nét, hiệu ứng nổi và bí ngô hai bên
+     * Tiêu đề game: Dùng bóng đổ 1px, KHÔNG dùng viền stroke dày gây nhòe chữ
      */
     createTitleArea(width) {
-        const titleY = 32;
+        const titleY = 30;
 
         // Quả bí ngô bên trái
-        this.leftPumpkin = this.add.image(38, titleY, 'pumpkin_icon')
+        this.leftPumpkin = this.add.image(30, titleY, 'pumpkin_icon')
             .setDepth(10)
             .setScale(1.2);
 
         // Quả bí ngô bên phải
-        this.rightPumpkin = this.add.image(width - 38, titleY, 'pumpkin_icon')
+        this.rightPumpkin = this.add.image(width - 30, titleY, 'pumpkin_icon')
             .setDepth(10)
             .setScale(1.2);
 
-        // Hiệu ứng nhấp nháy ánh lửa trong quả bí ngô
+        // Hiệu ứng nhấp nháy ánh lửa bí ngô
         this.tweens.add({
             targets: [this.leftPumpkin, this.rightPumpkin],
             scaleX: { from: 1.2, to: 1.3 },
@@ -407,46 +407,38 @@ export default class MenuScene extends Phaser.Scene {
             ease: 'Sine.easeInOut'
         });
 
-        // Tên game: COSTUME CAPER
-        // Sử dụng resolution: 2 và stroke nét để chữ không bị nhòe/mờ
+        // Tên game: COSTUME CAPER (Chữ to rõ nét, bóng đổ 1px kiểu arcade retro)
         this.titleText = this.add.text(width / 2, titleY, 'COSTUME CAPER', {
             fontFamily: '"Press Start 2P", monospace',
-            fontSize: '15px',
+            fontSize: '16px',
             color: '#ff7518',
-            stroke: '#10001f',
-            strokeThickness: 5,
-            shadow: { offsetX: 0, offsetY: 2, color: '#380654', blur: 0, fill: true },
-            resolution: 2,
+            shadow: { offsetX: 1, offsetY: 1, color: '#000000', blur: 0, fill: true },
         }).setOrigin(0.5).setDepth(10);
 
         // Tiêu đề bồng bềnh lên xuống nhẹ
         this.tweens.add({
             targets: [this.titleText, this.leftPumpkin, this.rightPumpkin],
-            y: '+=3',
+            y: '+=2',
             duration: 1800,
             yoyo: true,
             repeat: -1,
             ease: 'Sine.easeInOut'
         });
 
-        // Phụ đề phong cách Halloween
+        // Phụ đề Halloween rõ ràng, không viền đen bết dính
         this.add.text(width / 2, titleY + 16, '~ DEM HALLOWEEN BI AN ~', {
             fontFamily: '"Press Start 2P", monospace',
-            fontSize: '7px',
-            color: '#b388ff',
-            stroke: '#080114',
-            strokeThickness: 3,
-            resolution: 2,
+            fontSize: '8px',
+            color: '#c77dff',
+            shadow: { offsetX: 1, offsetY: 1, color: '#000000', blur: 0, fill: true },
         }).setOrigin(0.5).setDepth(10);
 
         // Lời dẫn truyện
         this.add.text(width / 2, titleY + 28, 'Lay lai chiec mat na bi danh cap!', {
             fontFamily: '"Press Start 2P", monospace',
-            fontSize: '6px',
+            fontSize: '7px',
             color: '#ffd166',
-            stroke: '#080114',
-            strokeThickness: 2,
-            resolution: 2,
+            shadow: { offsetX: 1, offsetY: 1, color: '#000000', blur: 0, fill: true },
         }).setOrigin(0.5).setDepth(10);
     }
 
@@ -462,10 +454,10 @@ export default class MenuScene extends Phaser.Scene {
 
         const box = this.add.graphics().setDepth(5);
         // Nền tối bán trong suốt
-        box.fillStyle(0x130722, 0.85);
+        box.fillStyle(0x130722, 0.9);
         box.fillRoundedRect(boxX - boxW / 2, boxY - boxH / 2, boxW, boxH, 4);
-        // Đường viền tím ma mị
-        box.lineStyle(1.5, 0x7b2cbf, 0.9);
+        // Đường viền cam tím
+        box.lineStyle(1, 0xff7518, 0.9);
         box.strokeRoundedRect(boxX - boxW / 2, boxY - boxH / 2, boxW, boxH, 4);
 
         // Danh sách các tùy chọn Menu
@@ -484,11 +476,9 @@ export default class MenuScene extends Phaser.Scene {
 
             const txt = this.add.text(boxX, btnY, opt.label, {
                 fontFamily: '"Press Start 2P", monospace',
-                fontSize: '8px',
-                color: '#d6c7ff',
-                stroke: '#0a0214',
-                strokeThickness: 3,
-                resolution: 2,
+                fontSize: '9px',
+                color: '#e2d5ff',
+                shadow: { offsetX: 1, offsetY: 1, color: '#000000', blur: 0, fill: true },
             }).setOrigin(0.5).setDepth(10).setInteractive({ useHandCursor: true });
 
             txt.on('pointerover', () => {
@@ -507,29 +497,25 @@ export default class MenuScene extends Phaser.Scene {
             this.buttonTexts.push(txt);
         });
 
-        // Con trỏ chọn ma quái hai bên nút
-        this.cursorLeft = this.add.text(boxX - 70, startY, '►', {
+        // Con trỏ chọn hai bên nút
+        this.cursorLeft = this.add.text(boxX - 68, startY, '►', {
             fontFamily: '"Press Start 2P", monospace',
-            fontSize: '8px',
+            fontSize: '9px',
             color: '#ff9f1c',
-            stroke: '#0a0214',
-            strokeThickness: 2,
-            resolution: 2
+            shadow: { offsetX: 1, offsetY: 1, color: '#000000', blur: 0, fill: true },
         }).setOrigin(0.5).setDepth(10);
 
-        this.cursorRight = this.add.text(boxX + 70, startY, '◄', {
+        this.cursorRight = this.add.text(boxX + 68, startY, '◄', {
             fontFamily: '"Press Start 2P", monospace',
-            fontSize: '8px',
+            fontSize: '9px',
             color: '#ff9f1c',
-            stroke: '#0a0214',
-            strokeThickness: 2,
-            resolution: 2
+            shadow: { offsetX: 1, offsetY: 1, color: '#000000', blur: 0, fill: true },
         }).setOrigin(0.5).setDepth(10);
 
         // Hoạt ảnh nhấp nhô của con trỏ
         this.tweens.add({
             targets: this.cursorLeft,
-            x: '-=3',
+            x: '-=2',
             duration: 400,
             yoyo: true,
             repeat: -1,
@@ -537,7 +523,7 @@ export default class MenuScene extends Phaser.Scene {
         });
         this.tweens.add({
             targets: this.cursorRight,
-            x: '+=3',
+            x: '+=2',
             duration: 400,
             yoyo: true,
             repeat: -1,
@@ -551,11 +537,9 @@ export default class MenuScene extends Phaser.Scene {
     createFooter(width, height) {
         this.add.text(width / 2, height - 7, 'W/S: Chon  |  ENTER: Xac nhan', {
             fontFamily: '"Press Start 2P", monospace',
-            fontSize: '5.5px',
-            color: '#7e6a9e',
-            stroke: '#05020a',
-            strokeThickness: 2,
-            resolution: 2,
+            fontSize: '6.5px',
+            color: '#9d8cd7',
+            shadow: { offsetX: 1, offsetY: 1, color: '#000000', blur: 0, fill: true },
         }).setOrigin(0.5).setDepth(10);
     }
 
@@ -592,11 +576,9 @@ export default class MenuScene extends Phaser.Scene {
 
         this.buttonTexts.forEach((txt, idx) => {
             if (idx === this.selectedIndex) {
-                txt.setColor('#ffe600');
-                txt.setScale(1.05);
+                txt.setColor('#ffea00');
             } else {
-                txt.setColor('#cbb2fe');
-                txt.setScale(1);
+                txt.setColor('#e2d5ff');
             }
         });
 
@@ -654,15 +636,15 @@ export default class MenuScene extends Phaser.Scene {
         const modal = this.add.graphics();
         modal.fillStyle(0x160a2b, 0.98);
         modal.fillRoundedRect((width - modalW) / 2, (height - modalH) / 2, modalW, modalH, 4);
-        modal.lineStyle(2, 0xff7518, 1);
+        modal.lineStyle(1.5, 0xff7518, 1);
         modal.strokeRoundedRect((width - modalW) / 2, (height - modalH) / 2, modalW, modalH, 4);
 
         // Tiêu đề bảng
         const title = this.add.text(width / 2, 35, '[ HUONG DAN CHOI ]', {
             fontFamily: '"Press Start 2P", monospace',
-            fontSize: '8px',
+            fontSize: '9px',
             color: '#ff9f1c',
-            resolution: 2,
+            shadow: { offsetX: 1, offsetY: 1, color: '#000000', blur: 0, fill: true },
         }).setOrigin(0.5);
 
         // Nội dung phím bấm và cốt truyện
@@ -673,21 +655,19 @@ export default class MenuScene extends Phaser.Scene {
             "Mat Na Bi Ngo bi danh cap\n" +
             "trong ham nguc ma am!", {
             fontFamily: '"Press Start 2P", monospace',
-            fontSize: '6px',
+            fontSize: '7px',
             color: '#e2d5ff',
             align: 'center',
-            lineSpacing: 3,
-            resolution: 2,
+            lineSpacing: 4,
+            shadow: { offsetX: 1, offsetY: 1, color: '#000000', blur: 0, fill: true },
         }).setOrigin(0.5);
 
         // Nút Đóng
         const closeBtn = this.add.text(width / 2, 134, '[ DONG / ESC ]', {
             fontFamily: '"Press Start 2P", monospace',
-            fontSize: '7px',
+            fontSize: '8px',
             color: '#57f287',
-            stroke: '#05010a',
-            strokeThickness: 2,
-            resolution: 2,
+            shadow: { offsetX: 1, offsetY: 1, color: '#000000', blur: 0, fill: true },
         }).setOrigin(0.5).setInteractive({ useHandCursor: true });
 
         closeBtn.on('pointerover', () => closeBtn.setColor('#ffea00'));

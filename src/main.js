@@ -13,7 +13,7 @@ const config = {
     physics: { default: 'arcade', arcade: { debug: true } },
     scale: {
         mode: Phaser.Scale.FIT,
-        autoCenter: Phaser.Scale.CENTER_BOTH,
+        autoCenter: Phaser.Scale.NO_CENTER,
     },
     scene: [BootScene, PreloadScene, MenuScene, GameScene],
 };
