@@ -18,9 +18,21 @@ export default class PreloadScene extends Phaser.Scene {
 
         // Asset
         this.load.image('dungeon-tiles', 'assets/tiles/dungeon-tiles.png');
+
+        const frame = { frameWidth: 24, frameHeight: 24 };
+        this.load.spritesheet('body', 'assets/characters/body_tan.png', frame);
+        this.load.spritesheet('outfit_robe', 'assets/costumes/outfits/outfit_robe.png', frame);
+        this.load.spritesheet('hair_short', 'assets/costumes/hair/short/hair_short_brown.png', frame);
+        this.load.spritesheet('hat_wizard', 'assets/costumes/hats/hat_wizard_hat.png', frame);
     }
 
     create() {
-        this.scene.start('MenuScene');
+        if (document.fonts) {
+            document.fonts.ready.then(() => {
+                this.scene.start('MenuScene');
+            });
+        } else {
+            this.scene.start('MenuScene');
+        }
     }
 }

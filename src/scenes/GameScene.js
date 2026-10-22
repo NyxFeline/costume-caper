@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import Player from '../entities/Player.js';
 
 export default class GameScene extends Phaser.Scene {
     constructor() {
@@ -6,7 +7,11 @@ export default class GameScene extends Phaser.Scene {
     }
 
     create() {
-        // Chỉ để kiểm tra asset nạp đúng, sẽ xóa sau
-        this.add.image(0, 0, 'dungeon-tiles').setOrigin(0, 0);
+        this.cameras.main.setBackgroundColor('#1b1426');
+        this.player = new Player(this, 160, 90);
+    }
+
+    update(time, delta) {
+        this.player.update(time, delta);
     }
 }
