@@ -6,6 +6,10 @@ const GAP = 4;     // khoảng cách giữa các ô
 // Depth của HUD phải lớn hơn mọi sprite trong thế giới (depth của chúng = toạ độ y, tối đa ~450)
 const DEPTH = 1000;
 
+const COLOR_LOCKED = 0x4a3b6b;
+const COLOR_UNLOCKED = 0xf29e3d;
+const COLOR_EQUIPPED = 0xffffff;
+
 export default class HUD {
     constructor(scene) {
         this.scene = scene;
@@ -22,7 +26,7 @@ export default class HUD {
 
             const bg = scene.add
                 .rectangle(x, y, SLOT, SLOT, 0x1b1426, 0.85)
-                .setStrokeStyle(1, 0x4a3b6b)
+                .setStrokeStyle(1, COLOR_LOCKED)
                 .setScrollFactor(0)
                 .setDepth(DEPTH);
 
@@ -43,7 +47,7 @@ export default class HUD {
                 .setScrollFactor(0)
                 .setDepth(DEPTH + 2);
 
-            this.slots[name] = { x, y, bg, icon };
+            this.slots[name] = { x, y, bg, icon, unlocked: false };
         });
     }
 
@@ -56,13 +60,23 @@ export default class HUD {
     // Mở khoá một ô: hiện đủ màu, viền cam, nảy nhẹ
     unlock(name) {
         const s = this.slots[name];
+        s.unlocked = true;
         s.icon.clearTint().setAlpha(1);
-        s.bg.setStrokeStyle(1, 0xf29e3d);
+        s.bg.setStrokeStyle(1, COLOR_UNLOCKED);
         this.scene.tweens.add({
             targets: s.icon,
             scale: { from: 1.6, to: 1 },
             duration: 250,
             ease: 'Back.Out',
+        });
+    }
+
+    // Đánh dấu ô đang mặc (viền trắng dày). name = null: không mặc gì.
+    select(name) {
+        Object.entries(this.slots).forEach(([n, s]) => {
+            if (n === name) s.bg.setStrokeStyle(2, COLOR_EQUIPPED);
+            else if (s.unlocked) s.bg.setStrokeStyle(1, COLOR_UNLOCKED);
+            else s.bg.setStrokeStyle(1, COLOR_LOCKED);
         });
     }
 }

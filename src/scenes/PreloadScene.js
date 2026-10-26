@@ -29,6 +29,8 @@ export default class PreloadScene extends Phaser.Scene {
         this.load.spritesheet('outfit_robe', 'assets/costumes/outfits/outfit_robe.png', frame);
         this.load.spritesheet('hair_short', 'assets/costumes/hair/short/hair_short_brown.png', frame);
         this.load.spritesheet('hat_wizard', 'assets/costumes/hats/hat_wizard_hat.png', frame);
+        this.load.spritesheet('outfit_tunic', 'assets/costumes/outfits/outfit_tunic.png', frame);
+        this.load.spritesheet('outfit_armor', 'assets/costumes/outfits/outfit_armor.png', frame);
     }
 
     create() {

@@ -21,11 +21,12 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
         this.body.setOffset(7, 14);
         this.setCollideWorldBounds(true);
 
-        // Các layer trang phục, thứ tự = thứ tự vẽ (cái sau đè lên cái trước)
+        // Các layer trang phục, thứ tự = thứ tự vẽ (cái sau đè lên cái trước).
+        // Hình dạng thật được đặt bởi applyLook() từ GameScene.
         this.layers = {
-            outfit: scene.add.sprite(x, y, 'outfit_robe', 0),
+            outfit: scene.add.sprite(x, y, 'outfit_tunic', 0),
             hair: scene.add.sprite(x, y, 'hair_short', 0),
-            hat: scene.add.sprite(x, y, 'hat_wizard', 0),
+            hat: scene.add.sprite(x, y, 'hat_wizard', 0).setVisible(false),
         };
 
         this.facing = 'down';
@@ -34,6 +35,24 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
 
         this.cursors = scene.input.keyboard.createCursorKeys();
         this.keys = scene.input.keyboard.addKeys('W,A,S,D');
+    }
+
+    // Đổi ngoại hình theo một "look" (dữ liệu thuần, không chứa logic gameplay)
+    applyLook(look) {
+        this.layers.outfit.setTexture(look.outfit);
+        this.layers.hair.setVisible(look.hair);
+
+        if (look.hat) {
+            this.layers.hat.setTexture(look.hat).setVisible(true);
+        } else {
+            this.layers.hat.setVisible(false);
+        }
+
+        [this, ...Object.values(this.layers)].forEach((sprite) => {
+            if (look.tint) sprite.setTint(look.tint);
+            else sprite.clearTint();
+            sprite.setAlpha(look.alpha);
+        });
     }
 
     update(time, delta) {

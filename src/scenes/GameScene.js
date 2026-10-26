@@ -1,12 +1,19 @@
 import Phaser from 'phaser';
 import Player from '../entities/Player.js';
 import HUD from '../ui/HUD.js';
-import { COSTUMES } from '../systems/CostumeSystem.js';
+import CostumeSystem, {
+    COSTUMES,
+    COSTUME_ORDER,
+    NO_COSTUME_LOOK,
+} from '../systems/CostumeSystem.js';
 
 // Rương Kenney: 89 đóng -> 90 hé nắp -> 91 mở hẳn
 const CHEST_CLOSED = 89;
 const CHEST_HALF = 90;
 const CHEST_OPEN = 91;
+
+// Tên phím cho ô 1, 2, 3 (theo thứ tự COSTUME_ORDER)
+const KEY_NAMES = ['ONE', 'TWO', 'THREE'];
 
 // Đọc custom property của object Tiled (hỗ trợ cả dạng mảng lẫn dạng object)
 function prop(obj, name) {
@@ -31,9 +38,9 @@ export default class GameScene extends Phaser.Scene {
         // Trạng thái màn chơi
         this.hasMask = false;
         this.won = false;
-        this.unlocked = new Set();
         this.enemies = [];
         this.chests = [];
+        this.costumes = new CostumeSystem();
 
         // ---------- Tilemap ----------
         const map = this.make.tilemap({ key: 'mansion' });
@@ -61,10 +68,13 @@ export default class GameScene extends Phaser.Scene {
         // ---------- Người chơi ----------
         const start = map.findObject('Objects', (o) => o.name === 'player_start');
         this.player = new Player(this, start.x, start.y);
+        this.player.applyLook(NO_COSTUME_LOOK);
 
         // ---------- Va chạm và tương tác ----------
         this.physics.add.collider(this.player, this.walls);
-        this.physics.add.collider(this.player, this.magicDoor);
+
+        // Cửa phép: chạm vào thì kiểm tra trang phục
+        this.physics.add.collider(this.player, this.magicDoor, () => this.tryOpenDoor());
 
         // Chạm vào rương -> rương mở
         this.physics.add.collider(this.player, this.chests, (player, chest) => {
@@ -92,11 +102,8 @@ export default class GameScene extends Phaser.Scene {
         this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
         this.cameras.main.startFollow(this.player, true);
 
-        // ---------- DEBUG tạm thời: xoá ở bước 5D ----------
-        this.input.keyboard.on('keydown-O', () => {
-            this.magicDoor.disableBody(true, true);
-            this.toast('[DEBUG] Da mo cua phep');
-        });
+        // ---------- Hệ thống trang phục ----------
+        this.setupCostumes();
     }
 
     update(time, delta) {
@@ -105,6 +112,65 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
         this.player.update(time, delta);
+    }
+
+    // ======================= Hệ thống trang phục =======================
+
+    setupCostumes() {
+        // Phím 1, 2, 3 -> mặc / cởi trang phục
+        COSTUME_ORDER.forEach((name, i) => {
+            this.input.keyboard.on(`keydown-${KEY_NAMES[i]}`, (event) => {
+                if (event.repeat || this.won) return; // bỏ qua khi giữ phím
+                this.costumes.toggle(name);
+            });
+        });
+
+        // Lắng nghe sự kiện từ CostumeSystem: logic không biết gì về hình ảnh,
+        // chính scene này nối logic với hình ảnh và HUD.
+        this.costumes.on('changed', (name) => {
+            this.player.applyLook(name ? COSTUMES[name].look : NO_COSTUME_LOOK);
+            this.hud.select(name);
+            this.poof();
+            this.toast(name ? `Dang mac: ${COSTUMES[name].label}` : 'Da thao trang phuc');
+        });
+
+        this.costumes.on('denied', () => {
+            this.toast('Ban chua co trang phuc nay');
+        });
+    }
+
+    // Hiệu ứng "bụp" khi đổi trang phục
+    poof() {
+        const p = this.player;
+        const ring = this.add.circle(p.x, p.y, 6, 0xffffff, 0.8).setDepth(p.y + 1);
+        this.tweens.add({
+            targets: ring,
+            scale: 3,
+            alpha: 0,
+            duration: 300,
+            onComplete: () => ring.destroy(),
+        });
+    }
+
+    // Cửa phép chỉ mở khi đang mặc đúng trang phục (data: door.requires = 'witch')
+    tryOpenDoor() {
+        const door = this.magicDoor;
+        if (door.opening) return;
+
+        if (this.costumes.is(door.requires)) {
+            door.opening = true;
+            door.disableBody(false, false); // hết chặn ngay, nhưng vẫn hiện để chạy hiệu ứng
+            this.toast('Cua phep da mo!');
+            this.tweens.add({
+                targets: door,
+                alpha: 0,
+                duration: 500,
+                onComplete: () => door.destroy(),
+            });
+        } else if (this.time.now > (this.doorHintAt ?? 0)) {
+            this.doorHintAt = this.time.now + 1500; // tránh hiện thông báo liên tục
+            this.toast('Cua bi khoa bang phep thuat...');
+        }
     }
 
     // ======================= Tạo vật thể từ layer Objects =======================
@@ -123,7 +189,8 @@ export default class GameScene extends Phaser.Scene {
         const c = tileCenter(o);
         this.magicDoor = this.physics.add
             .staticSprite(c.x, c.y, 'dungeon-sheet', o.gid - 1)
-            .setDepth(c.y);
+            .setDepth(c.y)
+            .setTint(0xb388ff); // ánh tím gợi ý đây là cửa phép
         this.magicDoor.requires = prop(o, 'requires');
     }
 
@@ -155,8 +222,9 @@ export default class GameScene extends Phaser.Scene {
         chest.setFrame(CHEST_HALF);
         this.time.delayedCall(120, () => chest.setFrame(CHEST_OPEN));
 
-        this.unlocked.add(chest.costume);
-        this.toast(`Nhan trang phuc: ${COSTUMES[chest.costume].label}`);
+        const def = COSTUMES[chest.costume];
+        this.costumes.unlock(chest.costume);
+        this.toast(`Nhan ${def.label}! Bam phim ${def.key} de mac`);
         this.flyToInventory(chest);
     }
 
@@ -195,6 +263,8 @@ export default class GameScene extends Phaser.Scene {
             },
         });
     }
+
+    // ======================= Thông báo tạm (thay bằng HUD thật ở giai đoạn Polish) =======================
 
     toast(message) {
         if (this.toastText) this.toastText.destroy();
