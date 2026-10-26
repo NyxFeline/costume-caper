@@ -18,6 +18,10 @@ export default class PreloadScene extends Phaser.Scene {
 
         // Asset
         this.load.image('dungeon-tiles', 'assets/tiles/dungeon-tiles.png');
+        this.load.spritesheet('dungeon-sheet', 'assets/tiles/dungeon-tiles.png', {
+            frameWidth: 16,
+            frameHeight: 16,
+        });
         this.load.tilemapTiledJSON('mansion', 'assets/maps/mansion.json');
 
         const frame = { frameWidth: 24, frameHeight: 24 };

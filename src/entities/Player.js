@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 
-const COLS = 9;                 // số cột mỗi hàng trên sprite sheet
-const SPEED = 60;               // pixel / giây
+const COLS = 9;       // số cột mỗi hàng trên sprite sheet
+const SPEED = 60;     // pixel / giây
 
 const DIR_ROW = { down: 0, left: 1, right: 2, up: 3 };
 
@@ -73,9 +73,14 @@ export default class Player extends Phaser.Physics.Arcade.Sprite {
         const frame = DIR_ROW[this.facing] * COLS + anim.start + step;
 
         this.setFrame(frame);
-        Object.values(this.layers).forEach((layer) => {
+
+        // Sắp xếp theo chiều sâu: đứng thấp hơn (y lớn hơn) thì được vẽ đè lên vật phía trên
+        this.setDepth(this.y);
+
+        Object.values(this.layers).forEach((layer, i) => {
             layer.setPosition(this.x, this.y);
             layer.setFrame(frame);
+            layer.setDepth(this.y + 0.1 * (i + 1));
         });
     }
 }
