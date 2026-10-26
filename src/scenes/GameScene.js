@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import Player from '../entities/Player.js';
-import Enemy from '../entities/Enemy.js'; // [MỚI] import Enemy
+import Enemy from '../entities/Enemy.js';
 import HUD from '../ui/HUD.js';
+import DetectionSystem from '../systems/DetectionSystem.js'; // [MỚI]
 import CostumeSystem, {
     COSTUMES,
     COSTUME_ORDER,
@@ -39,6 +40,7 @@ export default class GameScene extends Phaser.Scene {
         // Trạng thái màn chơi
         this.hasMask = false;
         this.won = false;
+        this.caught = false; // [MỚI] đã bị bắt chưa
         this.enemies = [];
         this.chests = [];
         this.costumes = new CostumeSystem();
@@ -55,7 +57,6 @@ export default class GameScene extends Phaser.Scene {
         this.hud = new HUD(this);
 
         // ---------- Đọc layer Objects ----------
-        // [SỬA] Lấy danh sách object ra biến, và gom waypoint thành các route TRƯỚC khi tạo enemy
         const objects = map.getObjectLayer('Objects').objects;
         this.routes = this.buildRoutes(objects);
 
@@ -75,6 +76,10 @@ export default class GameScene extends Phaser.Scene {
         this.player = new Player(this, start.x, start.y);
         this.player.applyLook(NO_COSTUME_LOOK);
 
+        // ---------- [MỚI] Hệ thống phát hiện: nối kẻ địch với người chơi ----------
+        this.detection = new DetectionSystem(this.walls, this.costumes);
+        this.enemies.forEach((e) => e.setTarget(this.player, this.detection));
+
         // ---------- Va chạm và tương tác ----------
         this.physics.add.collider(this.player, this.walls);
 
@@ -85,6 +90,14 @@ export default class GameScene extends Phaser.Scene {
         this.physics.add.collider(this.player, this.chests, (player, chest) => {
             if (!chest.collected) this.openChest(chest);
         });
+
+        // [MỚI] Chạm kẻ địch -> bị bắt, TRỪ KHI đang mặc đúng trang phục đánh lừa loại đó
+        this.physics.add.overlap(
+            this.player,
+            this.enemies,
+            (player, enemy) => this.onCaught(enemy),
+            (player, enemy) => !this.detection.isFooled(enemy.enemyType),
+        );
 
         // Nhặt mặt nạ
         this.physics.add.overlap(this.player, this.maskZone, () => {
@@ -97,7 +110,7 @@ export default class GameScene extends Phaser.Scene {
         // Lối thoát: chặn nếu chưa có mặt nạ, thắng nếu đã có
         this.physics.add.collider(this.player, this.exitZone, null, () => !this.hasMask);
         this.physics.add.overlap(this.player, this.exitZone, () => {
-            if (!this.hasMask || this.won) return;
+            if (!this.hasMask || this.won || this.caught) return;
             this.won = true;
             this.toast('THANG! (man hinh ket thuc se lam sau)');
         });
@@ -112,13 +125,26 @@ export default class GameScene extends Phaser.Scene {
     }
 
     update(time, delta) {
-        if (this.won) {
+        // [SỬA] Thắng hoặc bị bắt: đóng băng mọi thứ
+        if (this.won || this.caught) {
             this.player.setVelocity(0, 0);
-            this.enemies.forEach((e) => e.setVelocity(0, 0)); // [MỚI] kẻ địch cũng dừng khi thắng
+            this.enemies.forEach((e) => e.setVelocity(0, 0));
             return;
         }
         this.player.update(time, delta);
-        this.enemies.forEach((e) => e.update()); // [MỚI] cập nhật AI từng kẻ địch
+        this.enemies.forEach((e) => e.update());
+    }
+
+    // ======================= [MỚI] Bị bắt =======================
+    // TẠM THỜI: rung màn hình rồi chơi lại. Bước 4 sẽ thay bằng EndScene.
+
+    onCaught() {
+        if (this.caught || this.won) return;
+        this.caught = true;
+
+        this.cameras.main.shake(250, 0.01);
+        this.toast('Bi bat roi! Choi lai...');
+        this.time.delayedCall(900, () => this.scene.restart());
     }
 
     // ======================= Hệ thống trang phục =======================
@@ -127,7 +153,7 @@ export default class GameScene extends Phaser.Scene {
         // Phím 1, 2, 3 -> mặc / cởi trang phục
         COSTUME_ORDER.forEach((name, i) => {
             this.input.keyboard.on(`keydown-${KEY_NAMES[i]}`, (event) => {
-                if (event.repeat || this.won) return; // bỏ qua khi giữ phím
+                if (event.repeat || this.won || this.caught) return; // bỏ qua khi giữ phím
                 this.costumes.toggle(name);
             });
         });
@@ -182,8 +208,7 @@ export default class GameScene extends Phaser.Scene {
 
     // ======================= Tạo vật thể từ layer Objects =======================
 
-    // [MỚI] Gom các waypoint (kind = 'waypoint') thành { ghost1: [{x,y}, ...], ghost2: [...] }
-    // đã sắp xếp theo thuộc tính 'order' để kẻ địch đi đúng thứ tự.
+    // Gom waypoint thành { ghost1: [{x,y}, ...], ghost2: [...] }, sắp theo 'order'
     buildRoutes(objects) {
         const routes = {};
         objects
@@ -219,13 +244,16 @@ export default class GameScene extends Phaser.Scene {
         this.magicDoor.requires = prop(o, 'requires');
     }
 
-    // [SỬA] Dùng class Enemy thay cho sprite thường
     createEnemy(o) {
         const c = tileCenter(o);
         const enemy = new Enemy(this, c.x, c.y, o.gid - 1, {
             enemyType: prop(o, 'enemyType'),
-            waypoints: this.routes[prop(o, 'route')], // Skeleton Guard không có route -> undefined -> đứng yên
+            waypoints: this.routes[prop(o, 'route')], // Skeleton Guard không có route -> đứng yên
         });
+
+        // [MỚI] Kẻ địch không phải ma thì bị tường chặn
+        if (!enemy.phasing) this.physics.add.collider(enemy, this.walls);
+
         this.enemies.push(enemy);
     }
 
