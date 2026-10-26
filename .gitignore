@@ -24,3 +24,5 @@ dist-ssr
 *.sw?
 
 raw-assets/
+Code.md
+repomix.config.json

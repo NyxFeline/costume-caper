@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import Player from '../entities/Player.js';
+import Enemy from '../entities/Enemy.js'; // [MỚI] import Enemy
 import HUD from '../ui/HUD.js';
 import CostumeSystem, {
     COSTUMES,
@@ -54,7 +55,11 @@ export default class GameScene extends Phaser.Scene {
         this.hud = new HUD(this);
 
         // ---------- Đọc layer Objects ----------
-        map.getObjectLayer('Objects').objects.forEach((o) => {
+        // [SỬA] Lấy danh sách object ra biến, và gom waypoint thành các route TRƯỚC khi tạo enemy
+        const objects = map.getObjectLayer('Objects').objects;
+        this.routes = this.buildRoutes(objects);
+
+        objects.forEach((o) => {
             switch (prop(o, 'kind')) {
                 case 'chest': this.createChest(o); break;
                 case 'door': this.createDoor(o); break;
@@ -109,9 +114,11 @@ export default class GameScene extends Phaser.Scene {
     update(time, delta) {
         if (this.won) {
             this.player.setVelocity(0, 0);
+            this.enemies.forEach((e) => e.setVelocity(0, 0)); // [MỚI] kẻ địch cũng dừng khi thắng
             return;
         }
         this.player.update(time, delta);
+        this.enemies.forEach((e) => e.update()); // [MỚI] cập nhật AI từng kẻ địch
     }
 
     // ======================= Hệ thống trang phục =======================
@@ -175,6 +182,24 @@ export default class GameScene extends Phaser.Scene {
 
     // ======================= Tạo vật thể từ layer Objects =======================
 
+    // [MỚI] Gom các waypoint (kind = 'waypoint') thành { ghost1: [{x,y}, ...], ghost2: [...] }
+    // đã sắp xếp theo thuộc tính 'order' để kẻ địch đi đúng thứ tự.
+    buildRoutes(objects) {
+        const routes = {};
+        objects
+            .filter((o) => prop(o, 'kind') === 'waypoint')
+            .forEach((o) => {
+                const name = prop(o, 'route');
+                (routes[name] ??= []).push({
+                    x: o.x,
+                    y: o.y,
+                    order: Number(prop(o, 'order')),
+                });
+            });
+        Object.values(routes).forEach((list) => list.sort((a, b) => a.order - b.order));
+        return routes;
+    }
+
     createChest(o) {
         const c = tileCenter(o);
         // Bỏ qua gid trong Tiled: rương luôn bắt đầu ở trạng thái đóng
@@ -194,12 +219,14 @@ export default class GameScene extends Phaser.Scene {
         this.magicDoor.requires = prop(o, 'requires');
     }
 
+    // [SỬA] Dùng class Enemy thay cho sprite thường
     createEnemy(o) {
         const c = tileCenter(o);
-        const sprite = this.add.sprite(c.x, c.y, 'dungeon-sheet', o.gid - 1).setDepth(c.y);
-        sprite.enemyType = prop(o, 'enemyType');
-        sprite.route = prop(o, 'route');
-        this.enemies.push(sprite);
+        const enemy = new Enemy(this, c.x, c.y, o.gid - 1, {
+            enemyType: prop(o, 'enemyType'),
+            waypoints: this.routes[prop(o, 'route')], // Skeleton Guard không có route -> undefined -> đứng yên
+        });
+        this.enemies.push(enemy);
     }
 
     createMask(o) {
