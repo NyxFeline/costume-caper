@@ -5,6 +5,12 @@
 // =====================================================================
 
 let sharedCtx = null;
+let soundEnabled = true;
+
+// Menu gọi hàm này khi người chơi bật/tắt âm thanh
+export function setSoundEnabled(value) {
+    soundEnabled = value;
+}
 
 function getCtx() {
     if (!sharedCtx) {
@@ -17,6 +23,7 @@ function getCtx() {
 }
 
 function tone({ freq, to = freq, dur = 0.15, type = 'square', vol = 0.05, delay = 0 }) {
+    if (!soundEnabled) return;
     const ctx = getCtx();
     if (!ctx) return;
     try {
@@ -38,6 +45,11 @@ function tone({ freq, to = freq, dur = 0.15, type = 'square', vol = 0.05, delay 
 }
 
 export default class Sfx {
+    hover() { tone({ freq: 320, to: 520, dur: 0.04, type: 'square', vol: 0.04 }); }
+    select() {
+        tone({ freq: 440, dur: 0.1, type: 'triangle', vol: 0.06 });
+        tone({ freq: 660, dur: 0.12, type: 'triangle', vol: 0.06, delay: 0.06 });
+    }
     // Kẻ địch phát hiện bạn
     alert() { tone({ freq: 760, to: 260, dur: 0.22, type: 'sawtooth', vol: 0.07 }); }
     // Ma chuẩn bị lao tới

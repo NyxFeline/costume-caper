@@ -5,6 +5,14 @@ import Phaser from 'phaser';
 //   icon : frame trong sprite sheet 'dungeon-sheet' (hiện ở HUD)
 //   key  : phím tắt hiển thị trên HUD
 //   look : cách nhân vật HIỂN THỊ khi mặc (tách hẳn khỏi logic gameplay)
+//
+// Có hai kiểu look:
+//   - Ghép lớp (outfit / hair / hat): nhân vật vẫn là người, chỉ đổi đồ. (Witch)
+//   - Hoá thân (có `sprite`): ẩn nhân vật, hiện hẳn một sprite khác. (Ghost, Skeleton)
+//       sprite : frame trong 'dungeon-sheet'
+//       tint   : màu phủ (để phân biệt với kẻ địch thật)
+//       alpha  : độ trong suốt
+//       bob    : biên độ lơ lửng lên xuống (0 = đi bộ bình thường)
 // =====================================================================
 
 export const COSTUME_ORDER = ['ghost', 'skeleton', 'witch'];
@@ -12,11 +20,11 @@ export const COSTUME_ORDER = ['ghost', 'skeleton', 'witch'];
 export const COSTUMES = {
     ghost: {
         label: 'Ghost', icon: 121, key: '1',
-        look: { outfit: 'outfit_armor', hair: false, hat: null, tint: 0xcfe8ff, alpha: 0.6 },
+        look: { sprite: 121, tint: 0x9fe8ff, alpha: 0.8, bob: 2 },
     },
     skeleton: {
         label: 'Skeleton', icon: 97, key: '2',
-        look: { outfit: 'outfit_armor', hair: false, hat: null, tint: 0xe9e6d3, alpha: 1 },
+        look: { sprite: 97, tint: 0xd8ffd8, alpha: 1, bob: 0 },
     },
     witch: {
         label: 'Witch', icon: 84, key: '3',

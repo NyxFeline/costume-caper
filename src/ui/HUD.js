@@ -64,6 +64,31 @@ export default class HUD {
             })
             .setScrollFactor(0)
             .setDepth(DEPTH + 1);
+
+        // Thanh thể lực (chạy nhanh bằng SHIFT). Chỉ hiện khi chưa đầy.
+        this.staminaBg = scene.add
+            .rectangle(6, 21, 40, 3, 0x1b1426, 0.85)
+            .setOrigin(0, 0.5)
+            .setStrokeStyle(1, COLOR_LOCKED)
+            .setScrollFactor(0)
+            .setDepth(DEPTH + 1)
+            .setAlpha(0);
+        this.staminaFill = scene.add
+            .rectangle(6, 21, 40, 3, 0x57f287)
+            .setOrigin(0, 0.5)
+            .setScrollFactor(0)
+            .setDepth(DEPTH + 2)
+            .setAlpha(0);
+    }
+
+    // ratio: 0..1. exhausted: đang bị khoá chạy nhanh (thanh chuyển đỏ)
+    setStamina(ratio, exhausted) {
+        const visible = ratio < 0.999 ? 1 : 0;
+        this.staminaBg.setAlpha(visible);
+        this.staminaFill
+            .setAlpha(visible)
+            .setSize(Math.max(0, 40 * ratio), 3)
+            .setFillStyle(exhausted ? 0xff4d6d : ratio < 0.35 ? 0xffd166 : 0x57f287);
     }
 
     // Cập nhật số chìa khoá đang cầm

@@ -5,6 +5,9 @@ import Phaser from 'phaser';
 // Đây là DỮ LIỆU thuần. Muốn đổi luật chơi, chỉ cần sửa bảng này.
 // (Witch không lừa ai cả: nó dành cho cửa phép.)
 // =====================================================================
+// Hệ số tầm nhìn của kẻ địch khi người chơi đang chạy nhanh (đặt = 1 nếu không muốn đánh đổi này)
+const SPRINT_NOISE = 1.3;
+
 export const FOOLED_BY = {
     ghost: 'ghost',
     skeletonGuard: 'skeleton',
@@ -33,7 +36,9 @@ export default class DetectionSystem {
         const a = enemy.body.center;
         const b = player.body.center;
 
-        if (Phaser.Math.Distance.Between(a.x, a.y, b.x, b.y) > range) return false;
+        // Chạy nhanh thì ồn hơn: kẻ địch phát hiện bạn từ xa hơn
+        const noise = player.sprinting ? SPRINT_NOISE : 1;
+        if (Phaser.Math.Distance.Between(a.x, a.y, b.x, b.y) > range * noise) return false;
 
         // Có tường chắn giữa hai bên không?
         const line = new Phaser.Geom.Line(a.x, a.y, b.x, b.y);

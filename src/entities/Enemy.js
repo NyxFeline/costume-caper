@@ -20,6 +20,7 @@ const DASH_TIME = 360;
 const SEARCH_WAIT = 2600;  // ms lục soát quanh chỗ thấy bạn lần cuối
 const STATE_TIMEOUT = 6000; // an toàn: kẹt quá lâu thì bỏ qua
 const ARRIVE_DIST = 3;
+const CHECK_COOLDOWN = 3000; // lính gác gật đầu cho qua, tối đa mỗi 3 giây một lần
 const WOBBLE = 16;         // độ lắc ngang khi bay, tạo cảm giác "lơ lửng"
 
 // Màu báo trạng thái (giúp người chơi đọc được ý đồ của kẻ địch)
@@ -53,6 +54,11 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
 
         this.phase = Math.random() * Math.PI * 2; // mỗi con lắc lệch pha nhau
 
+        // Lính gác: chỉ quan tâm người chơi trong khu vực canh gác (bán kính leash quanh chỗ đứng)
+        this.leash = config.leash ?? 0;
+        this.isGuard = this.enemyType === 'skeletonGuard';
+        this.nextCheckAt = 0;
+
         // Ma bay xuyên tường và biết lao tới; các loại khác thì không
         this.isGhost = this.enemyType === 'ghost';
         this.phasing = this.isGhost;
@@ -79,8 +85,16 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
         const active = ACTIVE_STATES.includes(this.state);
 
         // Đang săn thì "mắt tốt" hơn để không bỏ cuộc quá dễ
-        const sees = !!this.player
+        let sees = !!this.player
             && this.detection.canSee(this, this.player, active ? LOSE_RANGE : SIGHT_RANGE);
+
+        // Lính gác không rời vị trí đi săn: người chơi ra khỏi khu vực canh gác thì coi như không thấy
+        if (sees && this.leash > 0) {
+            const c = this.player.body.center;
+            if (Phaser.Math.Distance.Between(c.x, c.y, this.home.x, this.home.y) > this.leash) {
+                sees = false;
+            }
+        }
 
         if (sees) {
             this.lastSeen = { x: this.player.body.center.x, y: this.player.body.center.y };
@@ -96,6 +110,9 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
             case 'RETURN': this.returnToRoute(now); break;
             default: break;
         }
+
+        // Lính gác kiểm tra trang phục: đúng thì gật đầu cho qua
+        if (this.isGuard && !ACTIVE_STATES.includes(this.state)) this.inspect(now);
 
         // Ma chập chờn khi chưa săn mồi
         if (this.isGhost && !ACTIVE_STATES.includes(this.state)) {
@@ -127,6 +144,18 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
             this.showMark('!', '#ff4444');
             this.scene.onEnemySpotted?.(this); // báo động cho kẻ địch gần đó
         }
+    }
+
+    // Người chơi đang mặc đúng trang phục và đứng trước mặt -> hiện "OK" cho biết đã qua kiểm tra
+    inspect(now) {
+        if (now < this.nextCheckAt || !this.player) return;
+        if (!this.detection.isFooled(this.enemyType)) return;
+
+        const c = this.player.body.center;
+        if (Phaser.Math.Distance.Between(this.x, this.y, c.x, c.y) > SIGHT_RANGE) return;
+
+        this.nextCheckAt = now + CHECK_COOLDOWN;
+        this.showMark('OK', '#57f287');
     }
 
     // Được đồng bọn báo động: chạy tới chỗ có người chơi để lục soát

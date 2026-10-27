@@ -21,7 +21,10 @@ const CHEST_OPEN = 91;
 const KEY_NAMES = ['ONE', 'TWO', 'THREE'];
 
 // Một con ma phát hiện bạn thì đồng bọn trong bán kính này sẽ kéo tới
-const ALERT_RADIUS = 150; // [MỚI]
+const ALERT_RADIUS = 150;
+
+// Bán kính khu vực canh gác của Skeleton Guard (bao trùm lối vào phòng cuối, không tới chỗ mặt nạ)
+const GUARD_LEASH = 112; // [MỚI]
 
 // Đọc custom property của object Tiled (hỗ trợ cả dạng mảng lẫn dạng object)
 function prop(obj, name) {
@@ -44,6 +47,7 @@ export default class GameScene extends Phaser.Scene {
     // Vào từ Menu: seed mới -> màn chơi mới. Bị bắt rồi chơi lại: giữ nguyên seed -> cùng màn để thử lại.
     init(data) {
         this.seed = data?.seed ?? Date.now();
+        this.attempt = data?.attempt ?? 1; // lần thử thứ mấy trên cùng một màn
     }
 
     create() {
@@ -56,7 +60,8 @@ export default class GameScene extends Phaser.Scene {
         this.keyCount = 0;
         this.chestHintAt = 0;
         this.doorHintAt = 0;
-        this.danger = false;     // [MỚI] đang bị săn đuổi?
+        this.startedAt = this.time.now; // [MỚI] để tính thời gian hoàn thành
+        this.danger = false;     // đang bị săn đuổi?
         this.heartbeat = null;   // [MỚI] bộ hẹn giờ nhịp tim
         this.enemies = [];
         this.chests = [];
@@ -160,7 +165,8 @@ export default class GameScene extends Phaser.Scene {
             if (!this.hasMask || this.won || this.caught) return;
             this.won = true;
             this.sfx.win();
-            this.toast('THANG! (man hinh ket thuc se lam sau)');
+            this.toast('THANG!');
+            this.time.delayedCall(1300, () => this.goToEnd('win'));
         });
 
         // ---------- Thế giới và camera ----------
@@ -183,6 +189,7 @@ export default class GameScene extends Phaser.Scene {
             return;
         }
         this.player.update(time, delta);
+        this.hud.setStamina(this.player.stamina / this.player.staminaMax, this.player.exhausted);
         this.enemies.forEach((e) => e.update());
 
         // [MỚI] Có con nào đang săn bạn không? -> bật hiệu ứng căng thẳng
@@ -238,8 +245,21 @@ export default class GameScene extends Phaser.Scene {
         }
     }
 
-    // ======================= Bị bắt =======================
-    // TẠM THỜI: rung màn hình rồi chơi lại. Bước 4 sẽ thay bằng EndScene.
+    // ======================= Kết thúc màn chơi =======================
+
+    // Chuyển sang EndScene, kèm thông tin để hiển thị và để chơi lại đúng màn
+    goToEnd(result) {
+        const seconds = Math.round((this.time.now - this.startedAt) / 1000);
+        this.cameras.main.fade(300, 16, 5, 26);
+        this.time.delayedCall(300, () => {
+            this.scene.start('EndScene', {
+                result,
+                seed: this.seed,
+                attempt: this.attempt,
+                seconds,
+            });
+        });
+    }
 
     onCaught() {
         if (this.caught || this.won) return;
@@ -250,9 +270,8 @@ export default class GameScene extends Phaser.Scene {
         this.sfx.caught();
 
         this.cameras.main.shake(300, 0.012);
-        this.toast('Bi bat roi! Choi lai...');
-        // Giữ nguyên seed: chơi lại đúng màn vừa rồi
-        this.time.delayedCall(1100, () => this.scene.restart({ seed: this.seed }));
+        this.toast('Bi bat roi!');
+        this.time.delayedCall(1100, () => this.goToEnd('lose'));
     }
 
     // ======================= Chia ngẫu nhiên =======================
@@ -436,10 +455,28 @@ export default class GameScene extends Phaser.Scene {
 
     createEnemy(o) {
         const c = tileCenter(o);
+        const enemyType = prop(o, 'enemyType');
         const enemy = new Enemy(this, c.x, c.y, o.gid - 1, {
-            enemyType: prop(o, 'enemyType'),
+            enemyType,
             waypoints: this.routes[prop(o, 'route')], // Skeleton Guard không có route -> đứng yên
+            // Lính gác chỉ canh trong bán kính này (có thể chỉnh bằng property `leash` trong Tiled)
+            leash: Number(prop(o, 'leash')) || (enemyType === 'skeletonGuard' ? GUARD_LEASH : 0),
         });
+
+        // Vẽ khu vực canh gác lên sàn để người chơi biết "chỗ kiểm tra" nằm ở đâu
+        if (enemy.leash > 0) {
+            const zone = this.add
+                .circle(c.x, c.y, enemy.leash, 0xe9e6d3, 0.07)
+                .setStrokeStyle(1, 0xe9e6d3, 0.3)
+                .setDepth(-1.5); // trên sàn (-2), dưới tường (-1)
+            this.tweens.add({
+                targets: zone,
+                alpha: { from: 0.6, to: 1 },
+                duration: 1200,
+                yoyo: true,
+                repeat: -1,
+            });
+        }
 
         // Kẻ địch không phải ma thì bị tường chặn
         if (!enemy.phasing) this.physics.add.collider(enemy, this.walls);
