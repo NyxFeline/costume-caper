@@ -5,35 +5,27 @@ import HUD from '../ui/HUD.js';
 import { createItemTextures } from '../ui/pixelTextures.js';
 import DetectionSystem from '../systems/DetectionSystem.js';
 import { assignCostumes, pickKeySlots } from '../systems/LootSystem.js';
-import Sfx from '../systems/Sfx.js'; // [MỚI]
+import Sfx from '../systems/Sfx.js';
 import CostumeSystem, {
     COSTUMES,
     COSTUME_ORDER,
     NO_COSTUME_LOOK,
 } from '../systems/CostumeSystem.js';
 
-// Rương Kenney: 89 đóng -> 90 hé nắp -> 91 mở hẳn
 const CHEST_CLOSED = 89;
 const CHEST_HALF = 90;
 const CHEST_OPEN = 91;
 
-// Tên phím cho ô 1, 2, 3 (theo thứ tự COSTUME_ORDER)
 const KEY_NAMES = ['ONE', 'TWO', 'THREE'];
-
-// Một con ma phát hiện bạn thì đồng bọn trong bán kính này sẽ kéo tới
 const ALERT_RADIUS = 150;
+const GUARD_LEASH = 112;
 
-// Bán kính khu vực canh gác của Skeleton Guard (bao trùm lối vào phòng cuối, không tới chỗ mặt nạ)
-const GUARD_LEASH = 112; // [MỚI]
-
-// Đọc custom property của object Tiled (hỗ trợ cả dạng mảng lẫn dạng object)
 function prop(obj, name) {
     const p = obj.properties;
     if (Array.isArray(p)) return p.find((q) => q.name === name)?.value;
     return p?.[name];
 }
 
-// Tile object trong Tiled có y là mép DƯỚI -> đổi sang tâm
 function tileCenter(obj) {
     return { x: obj.x + obj.width / 2, y: obj.y - obj.height / 2 };
 }
@@ -43,58 +35,50 @@ export default class GameScene extends Phaser.Scene {
         super('GameScene');
     }
 
-    // Seed quyết định cách chia ngẫu nhiên.
-    // Vào từ Menu: seed mới -> màn chơi mới. Bị bắt rồi chơi lại: giữ nguyên seed -> cùng màn để thử lại.
     init(data) {
         this.seed = data?.seed ?? Date.now();
-        this.attempt = data?.attempt ?? 1; // lần thử thứ mấy trên cùng một màn
+        this.attempt = data?.attempt ?? 1;
     }
 
     create() {
+        this.cameras.main.setRoundPixels(true);
         this.cameras.main.setBackgroundColor('#1b1426');
 
-        // Trạng thái màn chơi
         this.hasMask = false;
         this.won = false;
         this.caught = false;
         this.keyCount = 0;
         this.chestHintAt = 0;
         this.doorHintAt = 0;
-        this.startedAt = this.time.now; // [MỚI] để tính thời gian hoàn thành
-        this.danger = false;     // đang bị săn đuổi?
-        this.heartbeat = null;   // [MỚI] bộ hẹn giờ nhịp tim
+        this.startedAt = this.time.now;
+        this.danger = false;
+        this.heartbeat = null;
         this.enemies = [];
         this.chests = [];
         this.keySlots = [];
         this.keyPickups = [];
         this.costumes = new CostumeSystem();
-        this.sfx = new Sfx();    // [MỚI]
+        this.sfx = new Sfx();
 
-        // Bộ random có seed: cùng seed thì ra cùng kết quả
         this.rng = new Phaser.Math.RandomDataGenerator([String(this.seed)]);
-        console.log('[Costume Caper] seed =', this.seed);
 
         createItemTextures(this);
 
-        // ---------- Tilemap ----------
         const map = this.make.tilemap({ key: 'mansion' });
         const tileset = map.addTilesetImage('dungeon-tiles', 'dungeon-tiles');
 
         map.createLayer('Floor', tileset).setDepth(-2);
         this.walls = map.createLayer('Walls', tileset).setDepth(-1);
-        this.walls.setCollisionByExclusion([-1]); // mọi ô có tile trong Walls đều chặn
+        this.walls.setCollisionByExclusion([-1]);
 
-        // ---------- HUD ----------
         this.hud = new HUD(this);
 
-        // [MỚI] Viền đỏ phủ màn hình, hiện lên khi bị săn đuổi
         this.vignette = this.add
             .image(160, 90, 'vignette')
             .setScrollFactor(0)
             .setDepth(1090)
             .setAlpha(0);
 
-        // ---------- Đọc layer Objects ----------
         const objects = map.getObjectLayer('Objects').objects;
         this.routes = this.buildRoutes(objects);
 
@@ -105,7 +89,7 @@ export default class GameScene extends Phaser.Scene {
                 case 'enemy': this.createEnemy(o); break;
                 case 'mask': this.createMask(o); break;
                 case 'exit': this.createExit(o); break;
-                case 'keySpot': // [SỬA] có thêm khu vực (zone) và cờ "nằm sau cửa" (gated)
+                case 'keySpot':
                     this.keySlots.push({
                         x: o.x,
                         y: o.y,
@@ -113,36 +97,25 @@ export default class GameScene extends Phaser.Scene {
                         gated: String(prop(o, 'gated')) === 'true',
                     });
                     break;
-                default: break; // playerStart, waypoint: xử lý ở chỗ khác
+                default: break;
             }
         });
 
-        // Sau khi có đủ rương và điểm chìa khoá thì mới chia ngẫu nhiên
         this.assignLoot();
         this.spawnKeys();
 
-        // ---------- Người chơi ----------
         const start = map.findObject('Objects', (o) => o.name === 'player_start');
         this.player = new Player(this, start.x, start.y);
         this.player.applyLook(NO_COSTUME_LOOK);
 
-        // ---------- Hệ thống phát hiện: nối kẻ địch với người chơi ----------
         this.detection = new DetectionSystem(this.walls, this.costumes);
         this.enemies.forEach((e) => e.setTarget(this.player, this.detection));
 
-        // ---------- Va chạm và tương tác ----------
         this.physics.add.collider(this.player, this.walls);
-
-        // Cửa phép: chạm vào thì kiểm tra trang phục
         this.physics.add.collider(this.player, this.magicDoor, () => this.tryOpenDoor());
-
-        // Chạm vào rương: cần chìa khoá mới mở được
         this.physics.add.collider(this.player, this.chests, (player, chest) => this.tryOpenChest(chest));
-
-        // Nhặt chìa khoá
         this.physics.add.overlap(this.player, this.keyPickups, (player, key) => this.collectKey(key));
 
-        // Chạm kẻ địch -> bị bắt, TRỪ KHI đang mặc đúng trang phục đánh lừa loại đó
         this.physics.add.overlap(
             this.player,
             this.enemies,
@@ -150,38 +123,32 @@ export default class GameScene extends Phaser.Scene {
             (player, enemy) => !this.detection.isFooled(enemy.enemyType),
         );
 
-        // Nhặt mặt nạ
         this.physics.add.overlap(this.player, this.maskZone, () => {
             if (this.hasMask) return;
             this.hasMask = true;
             this.maskSprite.destroy();
             this.sfx.chest();
-            this.toast('Da lay mat na! Chay ra loi thoat!');
+            this.toast('Mask recovered! Rush to the exit!');
         });
 
-        // Lối thoát: chặn nếu chưa có mặt nạ, thắng nếu đã có
         this.physics.add.collider(this.player, this.exitZone, null, () => !this.hasMask);
         this.physics.add.overlap(this.player, this.exitZone, () => {
             if (!this.hasMask || this.won || this.caught) return;
             this.won = true;
             this.sfx.win();
-            this.toast('THANG!');
+            this.toast('VICTORY!');
             this.time.delayedCall(1300, () => this.goToEnd('win'));
         });
 
-        // ---------- Thế giới và camera ----------
         this.physics.world.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
         this.cameras.main.setBounds(0, 0, map.widthInPixels, map.heightInPixels);
         this.cameras.main.startFollow(this.player, true);
 
-        // ---------- Hệ thống trang phục ----------
         this.setupCostumes();
-
-        this.toast('Tim chia khoa de mo ruong!');
+        this.toast('Find keys to unlock chests!');
     }
 
     update(time, delta) {
-        // Thắng hoặc bị bắt: đóng băng mọi thứ
         if (this.won || this.caught) {
             this.player.setVelocity(0, 0);
             this.enemies.forEach((e) => e.setVelocity(0, 0));
@@ -192,20 +159,15 @@ export default class GameScene extends Phaser.Scene {
         this.hud.setStamina(this.player.stamina / this.player.staminaMax, this.player.exhausted);
         this.enemies.forEach((e) => e.update());
 
-        // [MỚI] Có con nào đang săn bạn không? -> bật hiệu ứng căng thẳng
         this.setDanger(this.enemies.some((e) => ACTIVE_STATES.includes(e.state)));
     }
 
-    // ======================= [MỚI] Kịch tính =======================
-
-    // Một kẻ địch vừa phát hiện người chơi
     onEnemySpotted(source) {
         if (this.won || this.caught) return;
 
         this.cameras.main.shake(140, 0.004);
         this.sfx.alert();
 
-        // Báo động: đồng bọn gần đó đang tuần tra sẽ kéo tới chỗ bạn bị phát hiện
         this.enemies.forEach((e) => {
             if (e === source) return;
             if (e.state !== 'PATROL' && e.state !== 'RETURN') return;
@@ -215,7 +177,6 @@ export default class GameScene extends Phaser.Scene {
         });
     }
 
-    // Bật/tắt trạng thái nguy hiểm: viền đỏ + tim đập
     setDanger(on) {
         if (on === this.danger) return;
         this.danger = on;
@@ -245,9 +206,6 @@ export default class GameScene extends Phaser.Scene {
         }
     }
 
-    // ======================= Kết thúc màn chơi =======================
-
-    // Chuyển sang EndScene, kèm thông tin để hiển thị và để chơi lại đúng màn
     goToEnd(result) {
         const seconds = Math.round((this.time.now - this.startedAt) / 1000);
         this.cameras.main.fade(300, 16, 5, 26);
@@ -270,14 +228,10 @@ export default class GameScene extends Phaser.Scene {
         this.sfx.caught();
 
         this.cameras.main.shake(300, 0.012);
-        this.toast('Bi bat roi!');
+        this.toast('Caught by the monsters!');
         this.time.delayedCall(1100, () => this.goToEnd('lose'));
     }
 
-    // ======================= Chia ngẫu nhiên =======================
-
-    // Trang phục trong rương: chia ngẫu nhiên nhưng luôn có thể thắng
-    // (xem assignCostumes: Witch không bao giờ nằm trong rương sau cửa phép).
     assignLoot() {
         const result = assignCostumes(
             this.rng,
@@ -289,7 +243,6 @@ export default class GameScene extends Phaser.Scene {
         });
     }
 
-    // Số chìa khoá = số rương. Rải ra các khu vực khác nhau (xem pickKeySlots).
     spawnKeys() {
         pickKeySlots(this.rng, this.keySlots, this.chests.length).forEach((slot) => {
             const glow = this.add.circle(slot.x, slot.y, 7, 0xffd166, 0.25).setDepth(slot.y - 1);
@@ -323,7 +276,7 @@ export default class GameScene extends Phaser.Scene {
         this.keyCount += 1;
         this.hud.setKeys(this.keyCount);
         this.sfx.key();
-        this.toast(`Nhat duoc chia khoa! (dang co ${this.keyCount})`);
+        this.toast(`Key acquired! (${this.keyCount} in bag)`);
 
         key.glow.destroy();
         key.disableBody(true, true);
@@ -334,9 +287,9 @@ export default class GameScene extends Phaser.Scene {
 
         if (this.keyCount <= 0) {
             if (this.time.now > this.chestHintAt) {
-                this.chestHintAt = this.time.now + 1500; // tránh hiện thông báo liên tục
+                this.chestHintAt = this.time.now + 1500;
                 this.sfx.locked();
-                this.toast('Ruong bi khoa! Hay tim chia khoa');
+                this.toast('Chest locked! Need a key.');
             }
             return;
         }
@@ -346,33 +299,27 @@ export default class GameScene extends Phaser.Scene {
         this.openChest(chest);
     }
 
-    // ======================= Hệ thống trang phục =======================
-
     setupCostumes() {
-        // Phím 1, 2, 3 -> mặc / cởi trang phục
         COSTUME_ORDER.forEach((name, i) => {
             this.input.keyboard.on(`keydown-${KEY_NAMES[i]}`, (event) => {
-                if (event.repeat || this.won || this.caught) return; // bỏ qua khi giữ phím
+                if (event.repeat || this.won || this.caught) return;
                 this.costumes.toggle(name);
             });
         });
 
-        // Lắng nghe sự kiện từ CostumeSystem: logic không biết gì về hình ảnh,
-        // chính scene này nối logic với hình ảnh và HUD.
         this.costumes.on('changed', (name) => {
             this.player.applyLook(name ? COSTUMES[name].look : NO_COSTUME_LOOK);
             this.hud.select(name);
             this.poof();
             this.sfx.costume();
-            this.toast(name ? `Dang mac: ${COSTUMES[name].label}` : 'Da thao trang phuc');
+            this.toast(name ? `Disguised: ${COSTUMES[name].label}` : 'Disguise removed');
         });
 
         this.costumes.on('denied', () => {
-            this.toast('Ban chua co trang phuc nay');
+            this.toast("Costume not unlocked yet!");
         });
     }
 
-    // Hiệu ứng "bụp" khi đổi trang phục
     poof() {
         const p = this.player;
         const ring = this.add.circle(p.x, p.y, 6, 0xffffff, 0.8).setDepth(p.y + 1);
@@ -385,16 +332,15 @@ export default class GameScene extends Phaser.Scene {
         });
     }
 
-    // Cửa phép chỉ mở khi đang mặc đúng trang phục (data: door.requires = 'witch')
     tryOpenDoor() {
         const door = this.magicDoor;
         if (door.opening) return;
 
         if (this.costumes.is(door.requires)) {
             door.opening = true;
-            door.disableBody(false, false); // hết chặn ngay, nhưng vẫn hiện để chạy hiệu ứng
+            door.disableBody(false, false);
             this.sfx.door();
-            this.toast('Cua phep da mo!');
+            this.toast('Magic door unsealed!');
             this.tweens.add({
                 targets: door,
                 alpha: 0,
@@ -402,15 +348,12 @@ export default class GameScene extends Phaser.Scene {
                 onComplete: () => door.destroy(),
             });
         } else if (this.time.now > this.doorHintAt) {
-            this.doorHintAt = this.time.now + 1500; // tránh hiện thông báo liên tục
+            this.doorHintAt = this.time.now + 1500;
             this.sfx.locked();
-            this.toast('Cua bi khoa bang phep thuat...');
+            this.toast('Sealed! Wear Witch robe.');
         }
     }
 
-    // ======================= Tạo vật thể từ layer Objects =======================
-
-    // Gom waypoint thành { ghost1: [{x,y}, ...], ghost2: [...] }, sắp theo 'order'
     buildRoutes(objects) {
         const routes = {};
         objects
@@ -429,16 +372,12 @@ export default class GameScene extends Phaser.Scene {
 
     createChest(o) {
         const c = tileCenter(o);
-        // Bỏ qua gid trong Tiled: rương luôn bắt đầu ở trạng thái đóng
         const chest = this.physics.add
             .staticSprite(c.x, c.y, 'dungeon-sheet', CHEST_CLOSED)
             .setDepth(c.y);
 
-        // costume trong Tiled chỉ còn là giá trị dự phòng; assignLoot() sẽ chia lại ngẫu nhiên
         chest.costume = prop(o, 'costume');
-        chest.gate = prop(o, 'gate'); // trang phục cần có để tới được rương này (nếu có)
-
-        // Ổ khoá nằm trên rương cho tới khi mở
+        chest.gate = prop(o, 'gate');
         chest.lock = this.add.image(c.x, c.y - 11, 'lock_icon').setDepth(c.y + 1);
 
         this.chests.push(chest);
@@ -449,7 +388,7 @@ export default class GameScene extends Phaser.Scene {
         this.magicDoor = this.physics.add
             .staticSprite(c.x, c.y, 'dungeon-sheet', o.gid - 1)
             .setDepth(c.y)
-            .setTint(0xb388ff); // ánh tím gợi ý đây là cửa phép
+            .setTint(0xb388ff);
         this.magicDoor.requires = prop(o, 'requires');
     }
 
@@ -458,17 +397,15 @@ export default class GameScene extends Phaser.Scene {
         const enemyType = prop(o, 'enemyType');
         const enemy = new Enemy(this, c.x, c.y, o.gid - 1, {
             enemyType,
-            waypoints: this.routes[prop(o, 'route')], // Skeleton Guard không có route -> đứng yên
-            // Lính gác chỉ canh trong bán kính này (có thể chỉnh bằng property `leash` trong Tiled)
+            waypoints: this.routes[prop(o, 'route')],
             leash: Number(prop(o, 'leash')) || (enemyType === 'skeletonGuard' ? GUARD_LEASH : 0),
         });
 
-        // Vẽ khu vực canh gác lên sàn để người chơi biết "chỗ kiểm tra" nằm ở đâu
         if (enemy.leash > 0) {
             const zone = this.add
                 .circle(c.x, c.y, enemy.leash, 0xe9e6d3, 0.07)
                 .setStrokeStyle(1, 0xe9e6d3, 0.3)
-                .setDepth(-1.5); // trên sàn (-2), dưới tường (-1)
+                .setDepth(-1.5);
             this.tweens.add({
                 targets: zone,
                 alpha: { from: 0.6, to: 1 },
@@ -478,26 +415,20 @@ export default class GameScene extends Phaser.Scene {
             });
         }
 
-        // Kẻ địch không phải ma thì bị tường chặn
         if (!enemy.phasing) this.physics.add.collider(enemy, this.walls);
-
         this.enemies.push(enemy);
     }
 
     createMask(o) {
-        // Điểm (point) trong Tiled đã là toạ độ tâm, không cần đổi
         this.maskSprite = this.add.circle(o.x, o.y, 5, 0xff4fd8).setStrokeStyle(1, 0xffffff).setDepth(o.y);
         this.maskZone = this.add.zone(o.x, o.y, 16, 16);
         this.physics.add.existing(this.maskZone, true);
     }
 
     createExit(o) {
-        // Hình chữ nhật trong Tiled có (x, y) là góc trên trái -> đổi sang tâm
         this.exitZone = this.add.zone(o.x + o.width / 2, o.y + o.height / 2, o.width, o.height);
         this.physics.add.existing(this.exitZone, true);
     }
-
-    // ======================= Rương và túi trang bị =======================
 
     openChest(chest) {
         chest.collected = true;
@@ -505,7 +436,6 @@ export default class GameScene extends Phaser.Scene {
         this.time.delayedCall(120, () => chest.setFrame(CHEST_OPEN));
         this.sfx.chest();
 
-        // Ổ khoá bật ra rồi biến mất
         if (chest.lock) {
             const lock = chest.lock;
             this.tweens.add({
@@ -519,7 +449,7 @@ export default class GameScene extends Phaser.Scene {
 
         const def = COSTUMES[chest.costume];
         this.costumes.unlock(chest.costume);
-        this.toast(`Nhan ${def.label}! Bam phim ${def.key} de mac`);
+        this.toast(`Found ${def.label}! Key: [${def.key}]`);
         this.flyToInventory(chest);
     }
 
@@ -531,7 +461,6 @@ export default class GameScene extends Phaser.Scene {
             .image(chest.x, chest.y - 4, 'dungeon-sheet', COSTUMES[name].icon)
             .setDepth(1050);
 
-        // Giai đoạn 1: nhảy lên khỏi rương (toạ độ thế giới)
         this.tweens.add({
             targets: icon,
             y: chest.y - 20,
@@ -539,7 +468,6 @@ export default class GameScene extends Phaser.Scene {
             ease: 'Back.Out',
             onComplete: () => {
                 this.time.delayedCall(250, () => {
-                    // Giai đoạn 2: đổi sang toạ độ màn hình rồi bay vào ô túi đồ
                     icon.setScrollFactor(0).setPosition(icon.x - cam.scrollX, icon.y - cam.scrollY);
                     const target = this.hud.slotPosition(name);
 
@@ -559,21 +487,20 @@ export default class GameScene extends Phaser.Scene {
         });
     }
 
-    // ======================= Thông báo tạm (thay bằng HUD thật ở giai đoạn Polish) =======================
-
     toast(message) {
         if (this.toastText) this.toastText.destroy();
         this.toastText = this.add
-            .text(160, 20, message, {
-                fontFamily: 'monospace',
+            .text(160, 18, message, {
+                fontFamily: '"Press Start 2P", monospace',
                 fontSize: '8px',
                 color: '#ffffff',
-                backgroundColor: '#000000aa',
+                backgroundColor: '#0d051ae6',
+                padding: { x: 8, y: 3 },
             })
             .setOrigin(0.5)
             .setScrollFactor(0)
             .setDepth(1100);
 
-        this.time.delayedCall(2000, () => this.toastText?.destroy());
+        this.time.delayedCall(2200, () => this.toastText?.destroy());
     }
 }

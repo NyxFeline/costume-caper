@@ -1,6 +1,3 @@
-// Vẽ pixel-art nhỏ thẳng vào texture bằng canvas, không cần file ảnh.
-// Gọi lại nhiều lần cũng an toàn (texture đã có thì bỏ qua).
-
 function drawGrid(scene, key, grid, colorMap) {
     if (scene.textures.exists(key)) return;
 
@@ -38,7 +35,6 @@ const LOCK_GRID = [
     'YYYYYYY',
 ];
 
-// Viền đỏ tối quanh màn hình, hiện lên khi bị đuổi (kích thước = màn hình game 320x180)
 function drawVignette(scene) {
     if (scene.textures.exists('vignette')) return;
 

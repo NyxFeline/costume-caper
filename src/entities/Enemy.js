@@ -1,32 +1,26 @@
 import Phaser from 'phaser';
 
-// ---------------- Tốc độ (Player chạy 60) ----------------
 const PATROL_SPEED = 34;
-const CHASE_SPEED = 50;    // chậm hơn Player một chút -> vẫn chạy thoát được
-const DASH_SPEED = 95;     // lao tới: nhanh hơn Player, nhưng rất ngắn và có báo trước
+const CHASE_SPEED = 50;
+const DASH_SPEED = 95;
 
-// ---------------- Tầm nhìn ----------------
-const SIGHT_RANGE = 72;    // bắt đầu phát hiện (~4.5 ô)
-const LOSE_RANGE = 104;    // đã thấy rồi thì phải ra xa hơn mức này mới mất dấu
+const SIGHT_RANGE = 72;
+const LOSE_RANGE = 104;
 
-// ---------------- Lao tới (chỉ ma) ----------------
-const DASH_MIN = 20;       // gần hơn mức này thì cứ đuổi thường
-const DASH_MAX = 64;       // xa hơn mức này thì chưa lao
+const DASH_MIN = 20;
+const DASH_MAX = 64;
 const DASH_COOLDOWN = 3200;
-const WINDUP_TIME = 320;   // thời gian báo trước: đứng khựng, đỏ rực. Đây là lúc né!
+const WINDUP_TIME = 320;
 const DASH_TIME = 360;
 
-// ---------------- Khác ----------------
-const SEARCH_WAIT = 2600;  // ms lục soát quanh chỗ thấy bạn lần cuối
-const STATE_TIMEOUT = 6000; // an toàn: kẹt quá lâu thì bỏ qua
+const SEARCH_WAIT = 2600;
+const STATE_TIMEOUT = 6000;
 const ARRIVE_DIST = 3;
-const CHECK_COOLDOWN = 3000; // lính gác gật đầu cho qua, tối đa mỗi 3 giây một lần
-const WOBBLE = 16;         // độ lắc ngang khi bay, tạo cảm giác "lơ lửng"
+const CHECK_COOLDOWN = 3000;
+const WOBBLE = 16;
 
-// Màu báo trạng thái (giúp người chơi đọc được ý đồ của kẻ địch)
 const STATE_TINT = { CHASE: 0xff9a9a, WINDUP: 0xff4040, DASH: 0xff0000, SEARCH: 0xffe082 };
 
-// Các trạng thái "đang săn bạn"
 export const ACTIVE_STATES = ['CHASE', 'WINDUP', 'DASH'];
 
 export default class Enemy extends Phaser.Physics.Arcade.Sprite {
@@ -38,28 +32,26 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
         this.enemyType = config.enemyType;
         this.waypoints = config.waypoints ?? [];
         this.wpIndex = 0;
-        this.dir = 1;               // chiều đi trên route (đôi khi đảo ngược)
-        this.pauseUntil = 0;        // dừng lại nhìn quanh khi tuần tra
-        this.home = { x, y };       // chỗ đứng gốc (cho Skeleton Guard không có route)
+        this.dir = 1;
+        this.pauseUntil = 0;
+        this.home = { x, y };
 
         this.state = 'PATROL';
         this.stateSince = 0;
-        this.lastSeen = null;       // nơi thấy người chơi lần cuối
-        this.searchEnd = 0;         // 0 = chưa tới nơi lục soát
-        this.wander = null;         // điểm lục soát hiện tại
+        this.lastSeen = null;
+        this.searchEnd = 0;
+        this.wander = null;
 
         this.dashReadyAt = 0;
         this.windupEnd = 0;
         this.dashEnd = 0;
 
-        this.phase = Math.random() * Math.PI * 2; // mỗi con lắc lệch pha nhau
+        this.phase = Math.random() * Math.PI * 2;
 
-        // Lính gác: chỉ quan tâm người chơi trong khu vực canh gác (bán kính leash quanh chỗ đứng)
         this.leash = config.leash ?? 0;
         this.isGuard = this.enemyType === 'skeletonGuard';
         this.nextCheckAt = 0;
 
-        // Ma bay xuyên tường và biết lao tới; các loại khác thì không
         this.isGhost = this.enemyType === 'ghost';
         this.phasing = this.isGhost;
         this.canDash = this.isGhost;
@@ -70,25 +62,18 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
         this.body.setSize(10, 10);
     }
 
-    // GameScene gọi sau khi Player và DetectionSystem đã được tạo
     setTarget(player, detection) {
         this.player = player;
         this.detection = detection;
     }
 
-    // ---------------------------------------------------------------
-    // State machine:
-    //   PATROL -> CHASE -> (WINDUP -> DASH -> CHASE)* -> SEARCH -> RETURN -> PATROL
-    // ---------------------------------------------------------------
     update() {
         const now = this.scene.time.now;
         const active = ACTIVE_STATES.includes(this.state);
 
-        // Đang săn thì "mắt tốt" hơn để không bỏ cuộc quá dễ
         let sees = !!this.player
             && this.detection.canSee(this, this.player, active ? LOSE_RANGE : SIGHT_RANGE);
 
-        // Lính gác không rời vị trí đi săn: người chơi ra khỏi khu vực canh gác thì coi như không thấy
         if (sees && this.leash > 0) {
             const c = this.player.body.center;
             if (Phaser.Math.Distance.Between(c.x, c.y, this.home.x, this.home.y) > this.leash) {
@@ -111,10 +96,8 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
             default: break;
         }
 
-        // Lính gác kiểm tra trang phục: đúng thì gật đầu cho qua
         if (this.isGuard && !ACTIVE_STATES.includes(this.state)) this.inspect(now);
 
-        // Ma chập chờn khi chưa săn mồi
         if (this.isGhost && !ACTIVE_STATES.includes(this.state)) {
             this.setAlpha(0.8 + 0.2 * Math.sin(now * 0.006 + this.phase));
         } else {
@@ -139,14 +122,12 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
             this.wander = null;
         }
 
-        // Vừa phát hiện bạn (không tính khi chỉ đổi giữa các trạng thái săn)
         if (next === 'CHASE' && !ACTIVE_STATES.includes(prev)) {
             this.showMark('!', '#ff4444');
-            this.scene.onEnemySpotted?.(this); // báo động cho kẻ địch gần đó
+            this.scene.onEnemySpotted?.(this);
         }
     }
 
-    // Người chơi đang mặc đúng trang phục và đứng trước mặt -> hiện "OK" cho biết đã qua kiểm tra
     inspect(now) {
         if (now < this.nextCheckAt || !this.player) return;
         if (!this.detection.isFooled(this.enemyType)) return;
@@ -158,23 +139,19 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
         this.showMark('OK', '#57f287');
     }
 
-    // Được đồng bọn báo động: chạy tới chỗ có người chơi để lục soát
     investigate(point) {
         this.lastSeen = { x: point.x, y: point.y };
         this.setState('SEARCH');
         this.showMark('?', '#ffd166');
     }
 
-    // ---------------------------------------------------------------
-    // Từng trạng thái
-    // ---------------------------------------------------------------
     patrol(now) {
         if (this.waypoints.length === 0) {
-            this.setVelocity(0, 0); // không có route -> đứng gác tại chỗ
+            this.setVelocity(0, 0);
             return;
         }
         if (now < this.pauseUntil) {
-            this.setVelocity(0, 0); // đang dừng lại nhìn quanh
+            this.setVelocity(0, 0);
             return;
         }
         const t = this.waypoints[this.wpIndex];
@@ -183,7 +160,6 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
         }
     }
 
-    // Tuần tra khó đoán: đôi khi quay đầu, nhảy cóc sang điểm khác, hoặc dừng lại
     pickNextWaypoint(now) {
         const n = this.waypoints.length;
         if (n > 1) {
@@ -202,7 +178,6 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
 
     chase(sees, now) {
         if (!sees) {
-            // Mất dấu (bị che khuất, chạy xa, hoặc bạn vừa đổi đúng trang phục)
             this.setVelocity(0, 0);
             this.setState('SEARCH');
             return;
@@ -218,7 +193,6 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
         this.moveToward(c.x, c.y, CHASE_SPEED);
     }
 
-    // Báo trước: đứng khựng lại và phình to. Người chơi có ~0.3 giây để né sang bên.
     startWindup(now) {
         this.setVelocity(0, 0);
         this.setState('WINDUP');
@@ -240,7 +214,6 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
         if (now >= this.windupEnd) this.startDash(now);
     }
 
-    // Lao thẳng về phía vị trí người chơi LÚC BẮT ĐẦU lao (không bám theo) -> né được
     startDash(now) {
         const c = this.player.body.center;
         const angle = Math.atan2(c.y - this.y, c.x - this.x);
@@ -251,7 +224,7 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
     }
 
     dash(now) {
-        if (now < this.dashEnd) return; // giữ nguyên vận tốc lao
+        if (now < this.dashEnd) return;
         this.dashReadyAt = now + DASH_COOLDOWN;
         this.setVelocity(0, 0);
         this.setState('CHASE');
@@ -261,7 +234,6 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
         const t = this.lastSeen;
 
         if (this.searchEnd === 0) {
-            // Giai đoạn 1: đi tới chỗ thấy bạn lần cuối
             if (!t || this.moveToward(t.x, t.y, CHASE_SPEED, WOBBLE)) {
                 this.searchEnd = now + SEARCH_WAIT;
                 this.wander = null;
@@ -269,10 +241,8 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
                 this.setState('RETURN');
             }
         } else if (now >= this.searchEnd) {
-            // Giai đoạn 3: lục soát xong -> về chỗ cũ
             this.setState('RETURN');
         } else if (!this.wander || this.moveToward(this.wander.x, this.wander.y, PATROL_SPEED, WOBBLE)) {
-            // Giai đoạn 2: lượn lờ lục soát quanh đó
             this.wander = {
                 x: t.x + Phaser.Math.Between(-28, 28),
                 y: t.y + Phaser.Math.Between(-28, 28),
@@ -286,17 +256,11 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
         if (this.moveToward(t.x, t.y, PATROL_SPEED, WOBBLE)) {
             this.setState('PATROL');
         } else if (now - this.stateSince > STATE_TIMEOUT) {
-            this.setPosition(t.x, t.y); // kẹt quá lâu: đưa thẳng về vị trí
+            this.setPosition(t.x, t.y);
             this.setState('PATROL');
         }
     }
 
-    // ---------------------------------------------------------------
-    // Tiện ích
-    // ---------------------------------------------------------------
-
-    // Di chuyển về (x, y). Trả về true khi đã tới nơi.
-    // wobble > 0: lắc ngang theo hình sin để chuyển động bớt "đường thẳng".
     moveToward(x, y, speed, wobble = 0) {
         const dx = x - this.x;
         const dy = y - this.y;
@@ -321,14 +285,12 @@ export default class Enemy extends Phaser.Physics.Arcade.Sprite {
         return false;
     }
 
-    // Dấu "!" / "?" nảy lên trên đầu
     showMark(text, color) {
         const mark = this.scene.add
             .text(this.x, this.y - 14, text, {
-                fontFamily: 'monospace',
-                fontSize: '10px',
+                fontFamily: '"Press Start 2P", monospace',
+                fontSize: '8px',
                 color,
-                fontStyle: 'bold',
             })
             .setOrigin(0.5)
             .setDepth(1050);

@@ -1,13 +1,6 @@
-// =====================================================================
-// Âm thanh 8-bit tạo bằng Web Audio, không cần file mp3.
-// Dùng chung MỘT AudioContext cho cả game (trình duyệt giới hạn số context,
-// nên không tạo mới mỗi lần chơi lại).
-// =====================================================================
-
 let sharedCtx = null;
 let soundEnabled = true;
 
-// Menu gọi hàm này khi người chơi bật/tắt âm thanh
 export function setSoundEnabled(value) {
     soundEnabled = value;
 }
@@ -39,9 +32,7 @@ function tone({ freq, to = freq, dur = 0.15, type = 'square', vol = 0.05, delay 
         gain.connect(ctx.destination);
         osc.start(t);
         osc.stop(t + dur);
-    } catch (e) {
-        // Âm thanh lỗi thì bỏ qua, không được làm hỏng game
-    }
+    } catch {}
 }
 
 export default class Sfx {
@@ -50,13 +41,9 @@ export default class Sfx {
         tone({ freq: 440, dur: 0.1, type: 'triangle', vol: 0.06 });
         tone({ freq: 660, dur: 0.12, type: 'triangle', vol: 0.06, delay: 0.06 });
     }
-    // Kẻ địch phát hiện bạn
     alert() { tone({ freq: 760, to: 260, dur: 0.22, type: 'sawtooth', vol: 0.07 }); }
-    // Ma chuẩn bị lao tới
     windup() { tone({ freq: 180, to: 700, dur: 0.3, type: 'sawtooth', vol: 0.05 }); }
-    // Ma lao tới
     dash() { tone({ freq: 320, to: 70, dur: 0.28, type: 'square', vol: 0.07 }); }
-    // Tim đập khi đang bị đuổi
     heartbeat() {
         tone({ freq: 75, to: 38, dur: 0.12, type: 'sine', vol: 0.16 });
         tone({ freq: 70, to: 36, dur: 0.12, type: 'sine', vol: 0.12, delay: 0.17 });

@@ -4,14 +4,18 @@ import BootScene from './scenes/BootScene.js';
 import PreloadScene from './scenes/PreloadScene.js';
 import MenuScene from './scenes/MenuScene.js';
 import GameScene from './scenes/GameScene.js';
-import EndScene from './scenes/EndScene.js'; // [MỚI]
+import EndScene from './scenes/EndScene.js';
 
 const config = {
     type: Phaser.AUTO,
     width: 320,
     height: 180,
     pixelArt: true,
-    // Khung hitbox chỉ hiện khi chạy `npm run dev`, tự tắt trong bản build (`npm run build`)
+    render: {
+        pixelArt: true,
+        roundPixels: true,
+        antialias: false,
+    },
     physics: { default: 'arcade', arcade: { debug: import.meta.env.DEV } },
     scale: {
         mode: Phaser.Scale.FIT,
