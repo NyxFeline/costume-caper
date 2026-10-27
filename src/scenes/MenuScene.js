@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { setSoundEnabled } from '../systems/Sfx.js';
 
 /**
  * Bộ tạo hiệu ứng âm thanh 8-bit bằng Web Audio API
@@ -37,7 +38,7 @@ class RetroAudio {
             gain.connect(this.ctx.destination);
             osc.start(now);
             osc.stop(now + 0.04);
-        } catch (e) {}
+        } catch (e) { }
     }
 
     playSelect() {
@@ -56,7 +57,7 @@ class RetroAudio {
                 osc.start(now + idx * 0.06);
                 osc.stop(now + idx * 0.06 + 0.12);
             });
-        } catch (e) {}
+        } catch (e) { }
     }
 
     playStart() {
@@ -76,7 +77,7 @@ class RetroAudio {
                 osc.start(now + idx * 0.05);
                 osc.stop(now + idx * 0.05 + 0.3);
             });
-        } catch (e) {}
+        } catch (e) { }
     }
 }
 
@@ -609,6 +610,7 @@ export default class MenuScene extends Phaser.Scene {
             this.openGuideModal();
         } else if (selected.id === 'sound') {
             this.audio.enabled = !this.audio.enabled;
+            setSoundEnabled(this.audio.enabled);
             selected.label = this.audio.enabled ? 'AM THANH: BAT' : 'AM THANH: TAT';
             this.buttonTexts[this.selectedIndex].setText(selected.label);
             if (this.audio.enabled) {
@@ -648,7 +650,7 @@ export default class MenuScene extends Phaser.Scene {
         }).setOrigin(0.5);
 
         // Nội dung phím bấm và cốt truyện
-        const content = this.add.text(width / 2, 76, 
+        const content = this.add.text(width / 2, 76,
             "WASD / Mui ten : Di chuyen\n\n" +
             "SPACE / ENTER  : Tuong tac\n\n" +
             "Nhiem vu: Tim lai chiec\n" +

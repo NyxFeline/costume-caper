@@ -11,6 +11,7 @@ const COLOR_UNLOCKED = 0xf29e3d;
 const COLOR_EQUIPPED = 0xffffff;
 
 export default class HUD {
+    // Cần texture 'key_icon' đã tồn tại (GameScene gọi createItemTextures trước khi tạo HUD)
     constructor(scene) {
         this.scene = scene;
         this.slots = {};
@@ -48,6 +49,31 @@ export default class HUD {
                 .setDepth(DEPTH + 2);
 
             this.slots[name] = { x, y, bg, icon, unlocked: false };
+        });
+
+        // Bộ đếm chìa khoá (góc trên trái)
+        this.keyIcon = scene.add
+            .image(12, 10, 'key_icon')
+            .setScrollFactor(0)
+            .setDepth(DEPTH + 1);
+        this.keyText = scene.add
+            .text(22, 5, 'x0', {
+                fontFamily: 'monospace',
+                fontSize: '8px',
+                color: '#ffd166',
+            })
+            .setScrollFactor(0)
+            .setDepth(DEPTH + 1);
+    }
+
+    // Cập nhật số chìa khoá đang cầm
+    setKeys(count) {
+        this.keyText.setText(`x${count}`);
+        this.scene.tweens.add({
+            targets: this.keyIcon,
+            scale: { from: 1.6, to: 1 },
+            duration: 220,
+            ease: 'Back.Out',
         });
     }
 
