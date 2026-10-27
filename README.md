@@ -2,6 +2,10 @@
 
 Costume Caper is a 2D pixel-art adventure game built with Phaser and Vite. Players must sneak past monsters in a haunted mansion, collect keys, use the right disguises, recover the mask, and escape.
 
+## Play online
+
+[Play Costume Caper](https://costume-caper.netlify.app/)
+
 ## Features
 
 - Pixel-art graphics rendered at an internal resolution of 320 x 180.
