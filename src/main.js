@@ -16,7 +16,7 @@ const config = {
         roundPixels: true,
         antialias: false,
     },
-    physics: { default: 'arcade', arcade: { debug: import.meta.env.DEV } },
+    physics: { default: 'arcade', arcade: { debug: false } },
     scale: {
         mode: Phaser.Scale.FIT,
         autoCenter: Phaser.Scale.NO_CENTER,
