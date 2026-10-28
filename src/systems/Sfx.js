@@ -5,6 +5,10 @@ export function setSoundEnabled(value) {
     soundEnabled = value;
 }
 
+export function isSoundEnabled() {
+    return soundEnabled;
+}
+
 function getCtx() {
     if (!sharedCtx) {
         const AC = window.AudioContext || window.webkitAudioContext;
@@ -32,7 +36,7 @@ function tone({ freq, to = freq, dur = 0.15, type = 'square', vol = 0.05, delay 
         gain.connect(ctx.destination);
         osc.start(t);
         osc.stop(t + dur);
-    } catch {}
+    } catch { }
 }
 
 export default class Sfx {

@@ -65,6 +65,8 @@ npm run preview
 - `W` / `A` / `S` / `D` or the arrow keys: move.
 - `Shift`: hold to sprint.
 - `1`, `2`, `3`: toggle the corresponding disguise.
+- `M`: toggle sound on or off.
+- `P`: pause or resume the game.
 
 The goal is to collect enough keys to open the chests, recover the mask, and reach the exit. Wearing the correct disguise near an enemy helps you avoid detection or pass guarded areas.
 
@@ -136,8 +138,8 @@ Gameplay audio is synthesized in `src/systems/Sfx.js`, so no `.mp3` or `.wav` fi
 
 The assets used in `public/assets/` come from the following sources:
 
-1. **Modular Pixel Character Clothing Pack — RealHumanName**  
-   https://realhumanname.itch.io/modular-pixel-character-clothing-pack
+1. **Jadewood Hero Base — JJ Kitty**  
+   https://jjkittyy.itch.io/jadewood-hero-base
 
    Used as the source for character clothing and accessories. Sprites should be checked for layer compatibility and viewing direction before being added or changed in the game.
 

@@ -5,7 +5,7 @@ import HUD from '../ui/HUD.js';
 import { createItemTextures } from '../ui/pixelTextures.js';
 import DetectionSystem from '../systems/DetectionSystem.js';
 import { assignCostumes, pickKeySlots } from '../systems/LootSystem.js';
-import Sfx from '../systems/Sfx.js';
+import Sfx, { isSoundEnabled, setSoundEnabled } from '../systems/Sfx.js';
 import CostumeSystem, {
     COSTUMES,
     COSTUME_ORDER,
@@ -53,6 +53,8 @@ export default class GameScene extends Phaser.Scene {
         this.startedAt = this.time.now;
         this.danger = false;
         this.heartbeat = null;
+        this.isPaused = false;
+        this.soundOn = isSoundEnabled();
         this.enemies = [];
         this.chests = [];
         this.keySlots = [];
@@ -145,10 +147,12 @@ export default class GameScene extends Phaser.Scene {
         this.cameras.main.startFollow(this.player, true);
 
         this.setupCostumes();
+        this.setupGameplayControls();
         this.toast('Find keys to unlock chests!');
     }
 
     update(time, delta) {
+        if (this.isPaused) return;
         if (this.won || this.caught) {
             this.player.setVelocity(0, 0);
             this.enemies.forEach((e) => e.setVelocity(0, 0));
@@ -320,6 +324,47 @@ export default class GameScene extends Phaser.Scene {
         });
     }
 
+    setupGameplayControls() {
+        this.input.keyboard.on('keydown-M', (event) => {
+            if (event.repeat || this.won || this.caught) return;
+            this.soundOn = !this.soundOn;
+            setSoundEnabled(this.soundOn);
+            this.toast(this.soundOn ? 'Sound: ON' : 'Sound: OFF');
+        });
+
+        this.input.keyboard.on('keydown-P', (event) => {
+            if (event.repeat || this.won || this.caught) return;
+            this.togglePause();
+        });
+    }
+
+    togglePause() {
+        this.isPaused = !this.isPaused;
+        if (this.isPaused) {
+            this.physics.world.pause();
+            this.tweens.pauseAll();
+            this.pauseOverlay = this.add.container(0, 0).setScrollFactor(0).setDepth(1200);
+            this.pauseOverlay.add([
+                this.add.rectangle(160, 90, 320, 180, 0x07020f, 0.82),
+                this.add.text(160, 78, 'PAUSED', {
+                    fontFamily: '"Press Start 2P", monospace',
+                    fontSize: '12px',
+                    color: '#ffea00',
+                }).setOrigin(0.5),
+                this.add.text(160, 103, 'PRESS P TO RESUME', {
+                    fontFamily: '"Press Start 2P", monospace',
+                    fontSize: '7px',
+                    color: '#ffffff',
+                }).setOrigin(0.5),
+            ]);
+        } else {
+            this.physics.world.resume();
+            this.tweens.resumeAll();
+            this.pauseOverlay?.destroy();
+            this.pauseOverlay = null;
+        }
+    }
+
     poof() {
         const p = this.player;
         const ring = this.add.circle(p.x, p.y, 6, 0xffffff, 0.8).setDepth(p.y + 1);
@@ -449,7 +494,7 @@ export default class GameScene extends Phaser.Scene {
 
         const def = COSTUMES[chest.costume];
         this.costumes.unlock(chest.costume);
-        this.toast(`Found ${def.label}! Key: [${def.key}]`);
+        this.toast(`Found ${def.label}! ${def.hint}. Key: [${def.key}]`);
         this.flyToInventory(chest);
     }
 
